@@ -2,6 +2,8 @@ from torch.utils.data import Dataset
 from text_manipulation import word_model
 from text_manipulation import extract_sentence_words
 from pathlib2 import Path
+from transformers import BertTokenizer
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 import re
 import wiki_utils
 import os
@@ -69,7 +71,7 @@ def get_sections(path, high_granularity=True):
     return sections
 
 
-def read_wiki_file(path, word2vec, remove_preface_segment=True, ignore_list=False, remove_special_tokens=False,
+def read_wiki_file(path, remove_preface_segment=True, ignore_list=False, remove_special_tokens=False,
                    return_as_sentences=False, high_granularity=True,only_letters = False):
     data = []
     targets = []
@@ -87,7 +89,7 @@ def read_wiki_file(path, word2vec, remove_preface_segment=True, ignore_list=Fals
                 if not return_as_sentences:
                     sentence_words = extract_sentence_words(sentence, remove_special_tokens=remove_special_tokens)
                     if 1 <= len(sentence_words):
-                        data.append([word_model(word, word2vec) for word in sentence_words])
+                        data.append(torch.tensor(tokenizer.convert_tokens_to_ids(tokenizer.tokenize(sentence))))
                     else:
                         #raise ValueError('Sentence in wikipedia file is empty')
                         logger.info('Sentence in wikipedia file is empty')
@@ -104,7 +106,7 @@ def read_wiki_file(path, word2vec, remove_preface_segment=True, ignore_list=Fals
 
 
 class WikipediaDataSet(Dataset):
-    def __init__(self, root, word2vec, train=True, manifesto=False, folder=False, high_granularity=False):
+    def __init__(self, root, train=True, manifesto=False, folder=False, high_granularity=False):
 
         if (manifesto):
             self.textfiles = list(Path(root).glob('*'))
@@ -122,25 +124,16 @@ class WikipediaDataSet(Dataset):
             raise RuntimeError('Found 0 images in subfolders of: {}'.format(root))
         self.train = train
         self.root = root
-        self.word2vec = word2vec
         self.high_granularity = high_granularity
 
     def __getitem__(self, index):
         path = self.textfiles[index]
 
-        return read_wiki_file(Path(path), self.word2vec, ignore_list=True, remove_special_tokens=True,
+        return read_wiki_file(Path(path), ignore_list=True, remove_special_tokens=True,
                               high_granularity=self.high_granularity)
 
     def __len__(self):
         return len(self.textfiles)
-
-from transformers import BertTokenizer
-
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-
-tokenized_text = tokenizer.tokenize(some_text)
-
-tokenizer.convert_tokens_to_ids(tokenized_text)
 
 max_seq_length = 256
 class text_dataset(Dataset):
